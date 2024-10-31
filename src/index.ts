@@ -257,7 +257,8 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
 
         const textEncoder = new TextEncoder()
         for (let [filename, { source, map }] of Object.entries(outputFiles)) {
-          let outFile = `${path.relative(outBase, filename)}.d.${outExt}`
+          const unglobBase = outBase.replace(/\*\*$/, '')
+          let outFile = `${path.relative(unglobBase, filename)}.d.${outExt}`
           if (options.extraOutdir) {
             outFile = path.join(options.extraOutdir, outFile)
           }
