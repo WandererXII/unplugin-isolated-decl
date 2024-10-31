@@ -39,14 +39,21 @@ export type OptionsResolved = Overwrite<
 >
 
 export function resolveOptions(options: Options): OptionsResolved {
-  return {
+  const transformer = options.transformer || 'typescript'
+  const resolved = {
     include: options.include || [/\.[cm]?tsx?$/],
     exclude: options.exclude || [/node_modules/],
     enforce: 'enforce' in options ? options.enforce : 'pre',
-    transformer: options.transformer || 'typescript',
+    transformer: transformer,
     ignoreErrors: options.ignoreErrors || false,
     extraOutdir: options.extraOutdir,
     autoAddExts: options.autoAddExts || false,
     patchCjsDefaultExport: options.patchCjsDefaultExport || false,
+    transformOptions:
+      transformer === 'typescript'
+        ? (options as any).transformOptions
+        : undefined,
   }
+
+  return resolved
 }
