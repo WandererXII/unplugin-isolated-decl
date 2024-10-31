@@ -11,6 +11,7 @@ export type Options = {
   /** Automatically add `.js` extension to resolve in `Node16` + ESM mode. */
   autoAddExts?: boolean
   /** Patch `export default` in `.d.cts` to `export = ` */
+  declarationMap?: boolean
   patchCjsDefaultExport?: boolean
 } & (
   | {
@@ -40,19 +41,21 @@ export type OptionsResolved = Overwrite<
 
 export function resolveOptions(options: Options): OptionsResolved {
   const transformer = options.transformer || 'typescript'
+  const transformOptions: TranspileOptions | undefined =
+    transformer === 'typescript' ? (options as any).transformOptions : undefined
   const resolved = {
     include: options.include || [/\.[cm]?tsx?$/],
     exclude: options.exclude || [/node_modules/],
     enforce: 'enforce' in options ? options.enforce : 'pre',
-    transformer: transformer,
+    transformer,
     ignoreErrors: options.ignoreErrors || false,
     extraOutdir: options.extraOutdir,
     autoAddExts: options.autoAddExts || false,
     patchCjsDefaultExport: options.patchCjsDefaultExport || false,
-    transformOptions:
-      transformer === 'typescript'
-        ? (options as any).transformOptions
-        : undefined,
+    transformOptions,
+    declarationMap:
+      options.declarationMap ||
+      !!transformOptions?.compilerOptions?.declarationMap,
   }
 
   return resolved

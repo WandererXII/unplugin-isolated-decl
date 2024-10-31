@@ -27,10 +27,10 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
     const options = resolveOptions(rawOptions)
     const filter = createFilter(options.include, options.exclude)
 
-    const outputFiles: Record<string, string> = {}
+    const outputFiles: Record<string, { source: string; map?: string }> = {}
 
-    function addOutput(filename: string, source: string) {
-      outputFiles[stripExt(filename)] = source
+    function addOutput(filename: string, source: string, map?: string) {
+      outputFiles[stripExt(filename)] = { source, map }
     }
 
     const rollup: Partial<Plugin> = {
@@ -62,7 +62,7 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
           entryFileNames = path.join(options.extraOutdir, entryFileNames)
         }
 
-        for (let [outname, source] of Object.entries(outputFiles)) {
+        for (let [outname, { source }] of Object.entries(outputFiles)) {
           const name: string =
             inputMap?.[outname] || path.relative(outBase, outname)
           const fileName = entryFileNames.replace('[name]', name)
@@ -140,19 +140,15 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
       let result: TransformResult
       switch (options.transformer) {
         case 'oxc':
-          result = await oxcTransform(id, code)
+          result = await oxcTransform(id, code, options)
           break
         case 'swc':
-          result = await swcTransform(id, code)
+          result = await swcTransform(id, code, options)
           break
         case 'typescript':
-          result = await tsTransform(
-            id,
-            code,
-            (options as any).transformOptions,
-          )
+          result = await tsTransform(id, code, options)
       }
-      const { code: sourceText, errors } = result
+      const { code: sourceText, map: sourceMap, errors } = result
       if (errors.length) {
         if (options.ignoreErrors) {
           context.warn(errors[0])
@@ -161,7 +157,7 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
           return
         }
       }
-      addOutput(id, sourceText)
+      addOutput(id, sourceText, sourceMap)
 
       if (!program) return
       const typeImports = program.body.filter(
@@ -252,7 +248,7 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
         }
 
         const textEncoder = new TextEncoder()
-        for (let [filename, source] of Object.entries(outputFiles)) {
+        for (let [filename, { source, map }] of Object.entries(outputFiles)) {
           const outDir = build.initialOptions.outdir
           let outFile = `${path.relative(outBase, filename)}.d.${outExt}`
           if (options.extraOutdir) {
@@ -265,6 +261,9 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
           if (write) {
             await mkdir(path.dirname(filePath), { recursive: true })
             await writeFile(filePath, source)
+            if (map) {
+              await writeFile(`${filePath}.map`, map)
+            }
           } else {
             result.outputFiles!.push({
               path: filePath,
@@ -272,6 +271,14 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
               hash: '',
               text: source,
             })
+            if (map) {
+              result.outputFiles!.push({
+                path: `${filePath}.map`,
+                contents: textEncoder.encode(map),
+                hash: '',
+                text: map,
+              })
+            }
           }
         }
       })
