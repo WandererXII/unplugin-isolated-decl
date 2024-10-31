@@ -33,6 +33,8 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
       outputFiles[stripExt(filename)] = { source, map }
     }
 
+    let outDir: string | undefined
+
     const rollup: Partial<Plugin> = {
       renderStart(outputOptions, inputOptions) {
         const { input } = inputOptions
@@ -137,16 +139,21 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
         code = s.toString()
       }
 
+      const fullOutDir =
+        options.extraOutdir && outDir
+          ? path.join(outDir, options.extraOutdir)
+          : outDir
+
       let result: TransformResult
       switch (options.transformer) {
         case 'oxc':
-          result = await oxcTransform(id, code, options)
+          result = await oxcTransform(id, code)
           break
         case 'swc':
-          result = await swcTransform(id, code, options)
+          result = await swcTransform(id, code, options, fullOutDir)
           break
         case 'typescript':
-          result = await tsTransform(id, code, options)
+          result = await tsTransform(id, code, options, fullOutDir)
       }
       const { code: sourceText, map: sourceMap, errors } = result
       if (errors.length) {
@@ -211,6 +218,7 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
     }
 
     function esbuildSetup(build: PluginBuild) {
+      outDir = build.initialOptions.outdir
       build.onEnd(async (result) => {
         const esbuildOptions = build.initialOptions
 
@@ -249,7 +257,6 @@ export const IsolatedDecl: UnpluginInstance<Options | undefined, false> =
 
         const textEncoder = new TextEncoder()
         for (let [filename, { source, map }] of Object.entries(outputFiles)) {
-          const outDir = build.initialOptions.outdir
           let outFile = `${path.relative(outBase, filename)}.d.${outExt}`
           if (options.extraOutdir) {
             outFile = path.join(options.extraOutdir, outFile)
